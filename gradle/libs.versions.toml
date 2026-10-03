@@ -1,6 +1,7 @@
 [versions]
 agp = "9.4.1"
 coreKtx = "1.10.1"
+espIdfProvisioningAndroid = "lib-2.4.4"
 junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
@@ -14,6 +15,7 @@ navigationCompose = "2.10.2"
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
+esp-idf-provisioning-android = { module = "com.github.espressif:esp-idf-provisioning-android", version.ref = "espIdfProvisioningAndroid" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
