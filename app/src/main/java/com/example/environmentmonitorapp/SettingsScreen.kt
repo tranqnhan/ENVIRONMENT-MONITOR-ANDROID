@@ -6,6 +6,7 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
@@ -38,6 +39,7 @@ import com.espressif.provisioning.ESPConstants
 import com.espressif.provisioning.ESPDevice
 import com.espressif.provisioning.ESPProvisionManager
 import com.espressif.provisioning.listeners.BleScanListener
+import com.espressif.provisioning.listeners.ProvisionListener
 import java.lang.Exception
 
 data class ProvisioningDevice (
@@ -158,10 +160,8 @@ class SettingsScreen: InternalScreen() {
         }
     }
 
-
-
     @Composable
-    fun BluetoothDeviceList(provisioningDevices: List<ProvisioningDevice>, onStartProvision: (espDevice: ESPDevice) -> Unit) {
+    fun BluetoothDeviceList(provisioningDevices: List<ProvisioningDevice>, onGetESPDevice: (espDevice: ESPDevice) -> Unit) {
         val context = LocalContext.current
 
         if (ContextCompat.checkSelfPermission(context,Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
@@ -181,14 +181,7 @@ class SettingsScreen: InternalScreen() {
                             provisioningDevice.primaryServiceUuid
                         )
 
-                        onStartProvision(espDevice)
-
-                        //TODO: wifi provision
-//                        espDevice.provision(
-//                            ssid,
-//                            password,
-//                            provisionListener
-//                        )
+                        onGetESPDevice(espDevice)
 
                     }
                 ) {
@@ -197,38 +190,20 @@ class SettingsScreen: InternalScreen() {
             }
         }
     }
-//
-//    selected.scanResult.scanRecord
-//    ?.serviceUuids
-//    ?.firstOrNull()
-//    ?.uuid
-//    ?.toString()
 
     @Composable
-    fun BluetoothScanAndProvision() {
-        val context: Context = LocalContext.current
-
-        var permissionGranted by remember {
-            mutableStateOf(false)
-        }
-
-        BluetoothPermissionCheck(
-            onPermissionGranted = {
-                permissionGranted = it
-            }
-        )
-
-        if (!permissionGranted) return
+    fun BluetoothScan(onESPDeviceReceived: (ESPDevice) -> Unit) {
+        val context = LocalContext.current
 
         // BLUETOOTH TEXT FIELD
         var scanState by remember { mutableStateOf<BluetoothScanState>(BluetoothScanState.IDLE) }
-        var bluetoothDeviceName by remember { mutableStateOf("") }
-        val bluetoothDevices = remember { mutableStateListOf<ProvisioningDevice>() }
+        var provisioningDeviceName by remember { mutableStateOf("") }
+        val provisioningDevices = remember { mutableStateListOf<ProvisioningDevice>() }
 
         OutlinedTextField(
-            value = bluetoothDeviceName,
+            value = provisioningDeviceName,
             onValueChange = {
-                bluetoothDeviceName = it
+                provisioningDeviceName = it
                 scanState = BluetoothScanState.IDLE
             },
             label = { Text("Bluetooth Device Name") },
@@ -249,19 +224,19 @@ class SettingsScreen: InternalScreen() {
                 onClick = {
                     scanState = BluetoothScanState.SCANNING
 
-                    bluetoothDevices.clear()
+                    provisioningDevices.clear()
 
                     beginBluetoothScan(
                         context = context,
-                        prefix = bluetoothDeviceName,
+                        prefix = provisioningDeviceName,
                         onScanComplete = {
                             scanState = BluetoothScanState.COMPLETE
                         },
                         onDeviceFound = { provisioningDevice ->
-                            if (!bluetoothDevices.any {
+                            if (!provisioningDevices.any {
                                     it.bluetoothDevice.address == provisioningDevice.bluetoothDevice.address
                                 }) {
-                                bluetoothDevices.add(provisioningDevice)
+                                provisioningDevices.add(provisioningDevice)
                             }
                         }
                     )
@@ -278,13 +253,129 @@ class SettingsScreen: InternalScreen() {
                 Text("SCAN")
             }
         } else {
-            BluetoothDeviceList(bluetoothDevices)
+            BluetoothDeviceList(
+                provisioningDevices,
+                onGetESPDevice = {
+                    espDevice ->
+                        onESPDeviceReceived(espDevice)
+                }
+            )
+        }
+    }
+
+    @Composable
+    fun WifiProvision(espDevice: ESPDevice) {
+        var ssid by remember { mutableStateOf("") }
+        var password by remember { mutableStateOf("") }
+
+        OutlinedTextField(
+            value = ssid,
+            onValueChange = {
+                ssid = it
+            },
+            label = { Text("SSID") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = password,
+            onValueChange = {
+                password = it
+            },
+            label = { Text("Password") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+
+        val interactionSource = remember { MutableInteractionSource() }
+        val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
+        val scanButtonColor = when {
+            scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.primary
         }
 
+        Button(
+            onClick = {
+                espDevice.provision(ssid,password,
+                    object: ProvisionListener {
+                        override fun createSessionFailed(p0: Exception?) {
+                            TODO("Not yet implemented")
+                        }
 
+                        override fun wifiConfigSent() {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun wifiConfigFailed(p0: Exception?) {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun wifiConfigApplied() {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun wifiConfigApplyFailed(p0: Exception?) {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun provisioningFailedFromDevice(p0: ESPConstants.ProvisionFailureReason?) {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun deviceProvisioningSuccess() {
+                            TODO("Not yet implemented")
+                        }
+
+                        override fun onProvisioningFailed(p0: Exception?) {
+                            TODO("Not yet implemented")
+                        }
+
+                    }
+               )
+            },
+            interactionSource = interactionSource,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RectangleShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = scanButtonColor,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Text("SUBMIT")
+        }
     }
 
 
+    @Composable
+    fun BluetoothScanAndWifiProvision() {
+        val context: Context = LocalContext.current
+
+        var permissionGranted by remember {
+            mutableStateOf(false)
+        }
+
+        BluetoothPermissionCheck(
+            onPermissionGranted = {
+                permissionGranted = it
+            }
+        )
+
+        if (!permissionGranted) return
+
+        var espDevice: ESPDevice? by remember { mutableStateOf(null)}
+
+        if (espDevice == null) {
+            BluetoothScan(
+                onESPDeviceReceived = {
+                    espDevice = it
+                }
+            )
+        } else {
+            WifiProvision(espDevice!!)
+        }
+    }
 
     @Composable
     override fun Display() {
@@ -294,7 +385,8 @@ class SettingsScreen: InternalScreen() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text("Network Provisioning")
-            BluetoothScanAndProvision()
+
+            BluetoothScanAndWifiProvision()
         }
 
     }
