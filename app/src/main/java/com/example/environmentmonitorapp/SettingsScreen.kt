@@ -47,6 +47,11 @@ data class ProvisioningDevice (
     val primaryServiceUuid: String
 )
 
+data class ProvisioningResult (
+    val success: Boolean,
+    val errorMessage: String
+)
+
 class SettingsScreen: InternalScreen() {
     init {
         screenName = "Settings";
@@ -96,6 +101,74 @@ class SettingsScreen: InternalScreen() {
                     }
                 }
             )
+    }
+
+    fun provisionDeviceWifi(
+        espDevice: ESPDevice,
+        ssid: String,
+        password: String,
+        onProvisionComplete: (result: ProvisioningResult) -> Unit
+    ) {
+        espDevice.provision(ssid,password,
+            object: ProvisionListener {
+                override fun createSessionFailed(p0: Exception?) {
+                    onProvisionComplete(
+                        ProvisioningResult(
+                            false, "Failure: Create session failed"
+                        )
+                    )
+                }
+
+                override fun wifiConfigSent() {
+                    TODO("Not yet implemented")
+                }
+
+                override fun wifiConfigFailed(p0: Exception?) {
+                    onProvisionComplete(
+                    ProvisioningResult(
+                        false,
+                        "Failure: Wi-Fi configurations failed" + p0?.let{ ". Reason: " + p0.message }
+                        )
+                    )
+                }
+
+                override fun wifiConfigApplied() {
+                    TODO("Not yet implemented")
+                }
+
+                override fun wifiConfigApplyFailed(p0: Exception?) {
+                    onProvisionComplete(
+                        ProvisioningResult(
+                            false,
+                            "Failure: Wi-Fi apply configurations failed" + p0?.let{ ". Reason: " + p0.message }
+                        )
+                    )
+                }
+
+                override fun provisioningFailedFromDevice(p0: ESPConstants.ProvisionFailureReason?) {
+                    onProvisionComplete(
+                        ProvisioningResult(
+                            false,
+                            "Failure: Device failure" + p0?.let{ ". Reason: $p0" }
+                        )
+                    )
+                }
+
+                override fun deviceProvisioningSuccess() {
+                    TODO("Not yet implemented")
+                }
+
+                override fun onProvisioningFailed(p0: Exception?) {
+                    onProvisionComplete(
+                    ProvisioningResult(
+                            false,
+                            "Failure: Provisioning failure" + p0?.let{ ". Reason: $p0" }
+                        )
+                    )
+                }
+
+            }
+        )
     }
 
     @Composable
@@ -298,42 +371,9 @@ class SettingsScreen: InternalScreen() {
 
         Button(
             onClick = {
-                espDevice.provision(ssid,password,
-                    object: ProvisionListener {
-                        override fun createSessionFailed(p0: Exception?) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun wifiConfigSent() {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun wifiConfigFailed(p0: Exception?) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun wifiConfigApplied() {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun wifiConfigApplyFailed(p0: Exception?) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun provisioningFailedFromDevice(p0: ESPConstants.ProvisionFailureReason?) {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun deviceProvisioningSuccess() {
-                            TODO("Not yet implemented")
-                        }
-
-                        override fun onProvisioningFailed(p0: Exception?) {
-                            TODO("Not yet implemented")
-                        }
-
-                    }
-               )
+                provisionDeviceWifi(espDevice, ssid, password, onProvisionComplete = {
+                    TODO("implement on provision complete")
+                })
             },
             interactionSource = interactionSource,
             modifier = Modifier.fillMaxWidth(),
