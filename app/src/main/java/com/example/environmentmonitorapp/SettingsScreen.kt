@@ -290,7 +290,7 @@ class SettingsScreen: InternalScreen() {
             onValueChange = {
                 proofOfPossession = it
             },
-            label = { Text("Bluetooth Device Name") },
+            label = { Text("PoP Code") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
