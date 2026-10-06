@@ -6,6 +6,9 @@ import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
@@ -109,7 +112,7 @@ class SettingsScreen: InternalScreen() {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun connectESPDevice(context: Context, provisioningDevice: ProvisioningDevice, proofOfPossession: String, onRespond: (ESPDevice?) -> Unit) {
+    fun connectESPDevice(context: Context, provisioningDevice: ProvisioningDevice, proofOfPossession: String): ESPDevice {
         val espDevice = ESPProvisionManager.getInstance(context)
             .createESPDevice(
                 ESPConstants.TransportType.TRANSPORT_BLE,
@@ -124,16 +127,41 @@ class SettingsScreen: InternalScreen() {
         espDevice.userName = provisioningDevice.bluetoothDevice.name
         espDevice.proofOfPossession = proofOfPossession
 
-        // Check PoP validity
-        espDevice.initSession(object : ResponseListener {
-            override fun onSuccess(returnData: ByteArray?) {
-                onRespond(espDevice)
-            }
+        return espDevice
+    }
 
-            override fun onFailure(e: Exception) {
-                onRespond(null)
+    fun verifyESPDevice(espDevice: ESPDevice, onDeviceVerified: (status: VerifyDeviceState, message: String) -> Unit) {
+        val handler = Handler(Looper.getMainLooper())
+        val startTime = System.currentTimeMillis()
+        val timeout = 10_000L
+
+        val checkVersionInfo = object : Runnable {
+            override fun run() {
+                if (espDevice.versionInfo != null) {
+                    Log.d("ESP", "versionInfo is ready")
+
+                    espDevice.initSession(object : ResponseListener {
+                        override fun onSuccess(returnData: ByteArray?) {
+                            Log.d("ESP", "PoP/session SUCCESS")
+                            onDeviceVerified(VerifyDeviceState.VALID, "Success: PoP verified")
+                        }
+
+                        override fun onFailure(e: Exception) {
+                            Log.e("ESP", "PoP/session FAILED", e)
+                            onDeviceVerified(VerifyDeviceState.INVALID, "Failure: PoP failed to be verified")
+                        }
+                    })
+
+                } else if (System.currentTimeMillis() - startTime < timeout) {
+                    handler.postDelayed(this, 100)
+                } else {
+                    Log.e("ESP", "Timed out waiting for versionInfo")
+                    onDeviceVerified(VerifyDeviceState.TIMEOUT, "Failure: Timed out waiting for versionInfo")
+                }
             }
-        })
+        }
+
+        handler.post(checkVersionInfo)
     }
 
 
@@ -143,6 +171,8 @@ class SettingsScreen: InternalScreen() {
         password: String,
         onProvisionComplete: (result: ProvisioningResult) -> Unit
     ) {
+
+
         espDevice.provision(ssid,password,
             object: ProvisionListener {
                 override fun createSessionFailed(p0: Exception?) {
@@ -189,6 +219,13 @@ class SettingsScreen: InternalScreen() {
                 }
 
                 override fun deviceProvisioningSuccess() {
+                    if (espDevice.versionInfo == null) {
+                        Log.d("MY VERSION INFO", "it is null")
+                    } else {
+                        Log.d("MY VERSION INFO", espDevice.versionInfo)
+                    }
+
+
                     onProvisionComplete(
                         ProvisioningResult(
                             true, "Success: Device successfully provisioned"
@@ -281,7 +318,7 @@ class SettingsScreen: InternalScreen() {
 
         if (ContextCompat.checkSelfPermission(context,Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
 
-        Text(provisioningDevice.bluetoothDevice.name)
+        Text("Device Name: " + provisioningDevice.bluetoothDevice.name)
 
         var proofOfPossession by remember { mutableStateOf("") }
 
@@ -302,24 +339,47 @@ class SettingsScreen: InternalScreen() {
             else -> MaterialTheme.colorScheme.primary
         }
         var isLoading by remember { mutableStateOf(false) }
-        var errorMessage by remember { mutableStateOf("") }
-
+        var infoMessage by remember { mutableStateOf("") }
+        var espDevice: ESPDevice? by remember {mutableStateOf(null)}
+        var retry: Boolean by remember { mutableStateOf(false) }
         if (!isLoading) {
             Button(
                 enabled = proofOfPossession.isNotEmpty(),
                 onClick = {
                     isLoading = true
-                    errorMessage = ""
-                    connectESPDevice(context, provisioningDevice, proofOfPossession,
-                        onRespond = {
-                            if (it == null) {
-                                errorMessage = "Device authentication failed"
+                    infoMessage = ""
+
+                    if (!retry) {
+                        espDevice = connectESPDevice(
+                            context = context,
+                            provisioningDevice = provisioningDevice,
+                            proofOfPossession = proofOfPossession,
+                        )
+                    }
+
+                    espDevice?.let { espDevice ->
+                        verifyESPDevice(
+                            espDevice,
+                            onDeviceVerified = {
+                                state: VerifyDeviceState, message: String ->
+
+                                infoMessage = message
                                 isLoading = false
-                            } else {
-                                onGetESPDevice(it)
+
+                                when (state) {
+                                    VerifyDeviceState.VALID -> {
+                                        onGetESPDevice(espDevice)
+                                    }
+                                    VerifyDeviceState.TIMEOUT -> {
+                                        retry = true
+                                    }
+                                    VerifyDeviceState.INVALID  -> {
+                                        retry = false
+                                    }
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 },
                 interactionSource = interactionSource,
                 modifier = Modifier.fillMaxWidth(),
@@ -329,10 +389,10 @@ class SettingsScreen: InternalScreen() {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text("SUBMIT")
+                Text(text = if (retry) "RETRY" else "SUBMIT")
             }
 
-            Text(errorMessage)
+            Text(infoMessage)
         } else {
             Box(
                 modifier = Modifier.fillMaxWidth(),
@@ -342,11 +402,6 @@ class SettingsScreen: InternalScreen() {
             }
         }
     }
-
-//    //
-//    selectedProvisioningDevice = provisioningDevice
-//    //val espDevice = connectESPDevice(context, provisioningDevice)
-//    //onGetESPDevice(espDevice)
 
     @Composable
     fun BluetoothDeviceList(provisioningDevices: List<ProvisioningDevice>, onSelectProvisioningDevice: (selectedProvisioningDevice: ProvisioningDevice) -> Unit) {
