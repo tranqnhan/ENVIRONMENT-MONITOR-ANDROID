@@ -45,8 +45,8 @@ import com.espressif.provisioning.ESPDevice
 import com.espressif.provisioning.ESPProvisionManager
 import com.espressif.provisioning.listeners.BleScanListener
 import com.espressif.provisioning.listeners.ProvisionListener
+import com.espressif.provisioning.listeners.ResponseListener
 import java.lang.Exception
-
 data class ProvisioningDevice (
     val bluetoothDevice: BluetoothDevice,
     val primaryServiceUuid: String
@@ -93,7 +93,7 @@ class SettingsScreen: InternalScreen() {
 
                         onDeviceFound(ProvisioningDevice(
                             bluetoothDevice = device,
-                            primaryServiceUuid = serviceUuid
+                            primaryServiceUuid = serviceUuid,
                         ))
                     }
 
@@ -108,7 +108,8 @@ class SettingsScreen: InternalScreen() {
             )
     }
 
-    fun connectESPDevice(context: Context, provisioningDevice: ProvisioningDevice): ESPDevice {
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun connectESPDevice(context: Context, provisioningDevice: ProvisioningDevice, proofOfPossession: String, onRespond: (ESPDevice?) -> Unit) {
         val espDevice = ESPProvisionManager.getInstance(context)
             .createESPDevice(
                 ESPConstants.TransportType.TRANSPORT_BLE,
@@ -120,12 +121,21 @@ class SettingsScreen: InternalScreen() {
             provisioningDevice.primaryServiceUuid
         )
 
-        //TODO: set proof of possession
-        espDevice.userName = "BLE_ESP32_PROV"
-        espDevice.proofOfPossession = "12345678"
+        espDevice.userName = provisioningDevice.bluetoothDevice.name
+        espDevice.proofOfPossession = proofOfPossession
 
-        return espDevice;
+        // Check PoP validity
+        espDevice.initSession(object : ResponseListener {
+            override fun onSuccess(returnData: ByteArray?) {
+                onRespond(espDevice)
+            }
+
+            override fun onFailure(e: Exception) {
+                onRespond(null)
+            }
+        })
     }
+
 
     fun provisionDeviceWifi(
         espDevice: ESPDevice,
@@ -264,11 +274,86 @@ class SettingsScreen: InternalScreen() {
         }
     }
 
+
     @Composable
-    fun BluetoothDeviceList(provisioningDevices: List<ProvisioningDevice>, onGetESPDevice: (espDevice: ESPDevice) -> Unit) {
+    fun BluetoothVerifyDevice(provisioningDevice: ProvisioningDevice, onGetESPDevice: (espDevice: ESPDevice) -> Unit) {
         val context = LocalContext.current
 
         if (ContextCompat.checkSelfPermission(context,Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+
+        Text(provisioningDevice.bluetoothDevice.name)
+
+        var proofOfPossession by remember { mutableStateOf("") }
+
+        OutlinedTextField(
+            value = proofOfPossession,
+            onValueChange = {
+                proofOfPossession = it
+            },
+            label = { Text("Bluetooth Device Name") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        val interactionSource = remember { MutableInteractionSource() }
+        val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
+        val scanButtonColor = when {
+            scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.primary
+        }
+        var isLoading by remember { mutableStateOf(false) }
+        var errorMessage by remember { mutableStateOf("") }
+
+        if (!isLoading) {
+            Button(
+                enabled = proofOfPossession.isNotEmpty(),
+                onClick = {
+                    isLoading = true
+                    errorMessage = ""
+                    connectESPDevice(context, provisioningDevice, proofOfPossession,
+                        onRespond = {
+                            if (it == null) {
+                                errorMessage = "Device authentication failed"
+                                isLoading = false
+                            } else {
+                                onGetESPDevice(it)
+                            }
+                        }
+                    )
+                },
+                interactionSource = interactionSource,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = scanButtonColor,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("SUBMIT")
+            }
+
+            Text(errorMessage)
+        } else {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+    }
+
+//    //
+//    selectedProvisioningDevice = provisioningDevice
+//    //val espDevice = connectESPDevice(context, provisioningDevice)
+//    //onGetESPDevice(espDevice)
+
+    @Composable
+    fun BluetoothDeviceList(provisioningDevices: List<ProvisioningDevice>, onSelectProvisioningDevice: (selectedProvisioningDevice: ProvisioningDevice) -> Unit) {
+        val context = LocalContext.current
+
+        if (ContextCompat.checkSelfPermission(context,Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return
+
 
         LazyColumn (
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -276,8 +361,7 @@ class SettingsScreen: InternalScreen() {
             items(provisioningDevices) { provisioningDevice ->
                 OutlinedButton(
                     onClick = {
-                        val espDevice = connectESPDevice(context, provisioningDevice)
-                        onGetESPDevice(espDevice)
+                        onSelectProvisioningDevice(provisioningDevice)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -292,76 +376,81 @@ class SettingsScreen: InternalScreen() {
     }
 
     @Composable
-    fun BluetoothScan(onESPDeviceReceived: (ESPDevice) -> Unit) {
+    fun BluetoothScan(onGetESPDevice: (ESPDevice) -> Unit) {
         val context = LocalContext.current
 
         // BLUETOOTH TEXT FIELD
         var scanState by remember { mutableStateOf<BluetoothScanState>(BluetoothScanState.IDLE) }
         var provisioningDeviceName by remember { mutableStateOf("") }
         val provisioningDevices = remember { mutableStateListOf<ProvisioningDevice>() }
+        var selectedProvisioningDevice: ProvisioningDevice? by remember { mutableStateOf(null) }
 
-        OutlinedTextField(
-            value = provisioningDeviceName,
-            onValueChange = {
-                provisioningDeviceName = it
-                scanState = BluetoothScanState.IDLE
-            },
-            label = { Text("Bluetooth Device Name") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (selectedProvisioningDevice == null) {
+            OutlinedTextField(
+                value = provisioningDeviceName,
+                onValueChange = {
+                    provisioningDeviceName = it
+                    scanState = BluetoothScanState.IDLE
+                },
+                label = { Text("Bluetooth Device Name") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
 
-        // SCAN BUTTON
-        val interactionSource = remember { MutableInteractionSource() }
-        val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
-        val scanButtonColor = when {
-            scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.primary
-        }
+            // SCAN BUTTON
+            val interactionSource = remember { MutableInteractionSource() }
+            val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
+            val scanButtonColor = when {
+                scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.primary
+            }
 
-        Button(
-            enabled = provisioningDeviceName.isNotEmpty() && scanState == BluetoothScanState.IDLE,
-            onClick = {
-                scanState = BluetoothScanState.SCANNING
+            Button(
+                enabled = provisioningDeviceName.isNotEmpty() && scanState == BluetoothScanState.IDLE,
+                onClick = {
+                    scanState = BluetoothScanState.SCANNING
 
-                provisioningDevices.clear()
+                    provisioningDevices.clear()
 
-                beginBluetoothScan(
-                    context = context,
-                    prefix = provisioningDeviceName,
-                    onScanComplete = {
-                        scanState = BluetoothScanState.COMPLETE
-                    },
-                    onDeviceFound = { provisioningDevice ->
-                        if (!provisioningDevices.any {
-                                it.bluetoothDevice.address == provisioningDevice.bluetoothDevice.address
-                            }) {
-                            provisioningDevices.add(provisioningDevice)
+                    beginBluetoothScan(
+                        context = context,
+                        prefix = provisioningDeviceName,
+                        onScanComplete = {
+                            scanState = BluetoothScanState.COMPLETE
+                        },
+                        onDeviceFound = { provisioningDevice ->
+                            if (!provisioningDevices.any {
+                                    it.bluetoothDevice.address == provisioningDevice.bluetoothDevice.address
+                                }) {
+                                provisioningDevices.add(provisioningDevice)
+                            }
                         }
+                    )
+
+                },
+                interactionSource = interactionSource,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RectangleShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = scanButtonColor,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("SCAN")
+            }
+
+            if (scanState != BluetoothScanState.IDLE) {
+                BluetoothDeviceList(
+                    provisioningDevices,
+                    onSelectProvisioningDevice = {
+                        selectedProvisioningDevice = it
                     }
                 )
+            }
+        } else {
+            BluetoothVerifyDevice(selectedProvisioningDevice!!, onGetESPDevice)
+        }
 
-            },
-            interactionSource = interactionSource,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RectangleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = scanButtonColor,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            )
-        ) {
-            Text("SCAN")
-        }
-        
-        if (scanState != BluetoothScanState.IDLE) {
-            BluetoothDeviceList(
-                provisioningDevices,
-                onGetESPDevice = {
-                    espDevice ->
-                        onESPDeviceReceived(espDevice)
-                }
-            )
-        }
     }
 
     @Composable
@@ -464,7 +553,7 @@ class SettingsScreen: InternalScreen() {
 
         if (espDevice == null) {
             BluetoothScan(
-                onESPDeviceReceived = {
+                onGetESPDevice = {
                     espDevice = it
                 }
             )
