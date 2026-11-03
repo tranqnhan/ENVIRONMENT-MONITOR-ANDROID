@@ -1,4 +1,4 @@
-package com.example.environmentmonitorapp
+package com.example.environmentmonitorapp.core
 
 enum class BluetoothScanState {
     IDLE,

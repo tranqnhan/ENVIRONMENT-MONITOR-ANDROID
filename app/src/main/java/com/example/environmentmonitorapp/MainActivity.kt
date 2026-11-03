@@ -34,6 +34,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.environmentmonitorapp.view.AnalyticsScreen
+import com.example.environmentmonitorapp.view.RegisterDeviceScreen
 import kotlinx.coroutines.CoroutineScope
 
 class MainActivity : ComponentActivity() {
@@ -62,7 +64,7 @@ fun NavigationButton(onClick: () -> Unit, text: String) {
 
 
 val pages = arrayOf(
-    SettingsScreen(),
+    RegisterDeviceScreen(),
     AnalyticsScreen()
 )
 
