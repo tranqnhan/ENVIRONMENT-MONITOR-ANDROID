@@ -35,6 +35,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.environmentmonitorapp.view.AnalyticsScreen
+import com.example.environmentmonitorapp.view.RegisterServerScreen
 import com.example.environmentmonitorapp.view.RegisterDeviceScreen
 import kotlinx.coroutines.CoroutineScope
 
@@ -64,8 +65,9 @@ fun NavigationButton(onClick: () -> Unit, text: String) {
 
 
 val pages = arrayOf(
-    RegisterDeviceScreen(),
-    AnalyticsScreen()
+    AnalyticsScreen(),
+    RegisterServerScreen(),
+    RegisterDeviceScreen()
 )
 
 @Composable
