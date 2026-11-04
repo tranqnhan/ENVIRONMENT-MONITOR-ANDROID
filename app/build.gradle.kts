@@ -56,4 +56,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.esp.idf.provisioning.android)
 
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.preferences.core)
+
 }
