@@ -1,12 +1,12 @@
 package com.example.environmentmonitorapp.api
 
-import retrofit2.Call
+import retrofit2.Response
 import retrofit2.http.POST
 
 interface ApiService {
-    @POST("verify")
-    fun verifyConnection(): Call<DatabaseLogin>
+    @POST("server/verify")
+    suspend fun verifyConnection(login: ServerLogin): Response<String>
 
     @POST("device/register")
-    fun registerDevice(): Call<DeviceRegistration>
+    fun registerDevice(deviceRegistration: DeviceRegistration): Response<String>
 }

@@ -4,6 +4,7 @@ converterGson = "3.0.0"
 coreKtx = "1.10.1"
 datastorePreferences = "1.3.0"
 datastorePreferencesCore = "1.3.0"
+desugar_jdk_libs = "2.1.5"
 espIdfProvisioningAndroid = "lib-2.4.4"
 junit = "4.13.2"
 junitVersion = "1.1.5"
@@ -22,6 +23,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-datastore-preferences-core = { module = "androidx.datastore:datastore-preferences-core", version.ref = "datastorePreferencesCore" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
+desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
 esp-idf-provisioning-android = { module = "com.github.espressif:esp-idf-provisioning-android", version.ref = "espIdfProvisioningAndroid" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

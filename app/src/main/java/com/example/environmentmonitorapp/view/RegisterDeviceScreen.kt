@@ -140,7 +140,7 @@ class RegisterDeviceScreen: InternalScreen() {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text("SCAN")
+                Text("SEARCH FOR DEVICE")
             }
 
             if (scanState != BluetoothScanState.IDLE) {
