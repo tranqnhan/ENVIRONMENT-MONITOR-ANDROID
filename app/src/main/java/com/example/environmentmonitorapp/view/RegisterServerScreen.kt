@@ -1,7 +1,6 @@
 package com.example.environmentmonitorapp.view
 
 import android.content.Context
-import android.util.Base64
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -35,13 +34,7 @@ import androidx.datastore.core.IOException
 import com.example.environmentmonitorapp.api.ServerLogin
 import kotlinx.coroutines.launch
 import com.example.environmentmonitorapp.api.RetrofitClient
-import com.example.environmentmonitorapp.core.EncryptionKey
-import com.example.environmentmonitorapp.core.SERVER_PASSWORD
-import com.example.environmentmonitorapp.core.SERVER_PASSWORD_IV
-import com.example.environmentmonitorapp.core.SERVER_URL
-import com.example.environmentmonitorapp.core.dataStore
-import javax.crypto.Cipher
-import kotlin.also
+import com.example.environmentmonitorapp.core.SettingsDatastore
 
 class RegisterServerScreen: InternalScreen() {
     init {
@@ -124,28 +117,12 @@ class RegisterServerScreen: InternalScreen() {
 
                     scope.launch {
                         try {
-                            val response = RetrofitClient.api.verifyConnection(
-                                ServerLogin(
-                                    serverPassword=serverPassword
-                                )
+                            val response = RetrofitClient.getAPI(serverURL).authConnection(
+                                ServerLogin(serverPassword = serverPassword)
                             )
+
                             if (response.isSuccessful) {
-                                // encryption
-                                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-                                cipher.init(Cipher.ENCRYPT_MODE, EncryptionKey.getOrCreateKey())
-
-                                val cipherText = cipher.doFinal(serverPassword.toByteArray(Charsets.UTF_8))
-                                val iv = cipher.iv
-
-                                // stores to datastore
-                                context.dataStore.updateData {
-                                    it.toMutablePreferences().also { preferences ->
-                                        preferences[SERVER_URL] = serverURL
-                                        preferences[SERVER_PASSWORD] = Base64.encodeToString(cipherText, Base64.NO_WRAP)
-                                        preferences[SERVER_PASSWORD_IV] = Base64.encodeToString(iv, Base64.NO_WRAP)
-                                    }
-                                }
-
+                                SettingsDatastore(context).saveServerCredentials(serverURL, serverPassword)
                                 onSuccess()
                             } else {
                                 error = "HTTPS error: " + response.code()
