@@ -1,6 +1,7 @@
 package com.example.environmentmonitorapp.view
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.IOException
-import com.example.environmentmonitorapp.api.ServerLogin
+import com.example.environmentmonitorapp.api.AuthRequest
 import kotlinx.coroutines.launch
 import com.example.environmentmonitorapp.api.RetrofitClient
 import com.example.environmentmonitorapp.core.SettingsDatastore
@@ -117,9 +118,11 @@ class RegisterServerScreen: InternalScreen() {
 
                     scope.launch {
                         try {
-                            val response = RetrofitClient.getAPI(serverURL).authConnection(
-                                ServerLogin(serverPassword = serverPassword)
-                            )
+                            val response = RetrofitClient
+                                .getAPI(serverURL)
+                                .authConnection(
+                                    AuthRequest(serverPassword)
+                                )
 
                             if (response.isSuccessful) {
                                 SettingsDatastore(context).saveServerCredentials(serverURL, serverPassword)
@@ -129,6 +132,7 @@ class RegisterServerScreen: InternalScreen() {
                             }
                         } catch (e: IOException) {
                             error = "Error: " + e.message.toString()
+                            Log.e("Server Connection", "Request failed", e)
                         }
 
                         isLoading = false
@@ -152,6 +156,10 @@ class RegisterServerScreen: InternalScreen() {
             ) {
                 CircularProgressIndicator()
             }
+        }
+
+        if (error.isNotBlank() && !isLoading) {
+            Text(error)
         }
 
     }
