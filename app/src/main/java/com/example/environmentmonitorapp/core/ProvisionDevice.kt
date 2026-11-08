@@ -30,7 +30,7 @@ data class WifiProvisionResult (
  */
 
 class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUuid: String) {
-    private var monitorDevice: ESPDevice? = null;
+    var monitorDevice: ESPDevice? = null;
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(context: Context, proofOfPossession: String): Boolean {
@@ -48,7 +48,7 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
         return true;
     }
 
-    fun verify(onDeviceVerify: (status: VerifyDeviceState, message: String) -> Unit) {
+    fun verify(onSuccess: (message: String) -> Unit, onFailure: (message: String) -> Unit) {
         if (this.monitorDevice == null) return
 
         val handler = Handler(Looper.getMainLooper())
@@ -63,19 +63,20 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
                     monitorDevice!!.initSession(object : ResponseListener {
                         override fun onSuccess(returnData: ByteArray?) {
                             Log.d("ESP", "PoP/session SUCCESS")
-                            onDeviceVerify(VerifyDeviceState.VALID, "Success: PoP verified")
+
+                            onSuccess( "Success: PoP verified")
                         }
 
                         override fun onFailure(e: Exception) {
                             Log.e("ESP", "PoP/session FAILED", e)
-                            onDeviceVerify(VerifyDeviceState.INVALID, "Failure: PoP failed to be verified")
+                            onFailure("Failure: PoP failed to be verified")
                         }
                     })
                 } else if (System.currentTimeMillis() - startTime < timeout) {
                     handler.postDelayed(this, 100)
                 } else {
                     Log.e("ESP", "Timed out waiting for versionInfo")
-                    onDeviceVerify(VerifyDeviceState.TIMEOUT, "Failure: Timed out waiting for versionInfo")
+                    onFailure("Failure: Timed out waiting for versionInfo")
                 }
             }
         }
@@ -159,6 +160,15 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
 
             }
         )
+    }
+
+
+    fun getUsername(): String {
+        return monitorDevice!!.deviceName
+    }
+
+    fun getPassword(): String {
+        return monitorDevice!!.proofOfPossession
     }
 
 }

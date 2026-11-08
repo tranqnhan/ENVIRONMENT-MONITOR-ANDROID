@@ -28,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,11 +37,14 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.espressif.provisioning.ESPDevice
+import com.example.environmentmonitorapp.api.DeviceRegistration
+import com.example.environmentmonitorapp.api.RetrofitClient
 import com.example.environmentmonitorapp.core.BluetoothScanState
 import com.example.environmentmonitorapp.core.BluetoothScanner
 import com.example.environmentmonitorapp.core.ProvisionDevice
+import com.example.environmentmonitorapp.core.SettingsDatastore
 import com.example.environmentmonitorapp.core.VerifyDeviceState
+import kotlinx.coroutines.launch
 
 class RegisterDeviceScreen: InternalScreen() {
     init {
@@ -186,6 +190,7 @@ class RegisterDeviceScreen: InternalScreen() {
         var isLoading by remember { mutableStateOf(false) }
         var infoMessage by remember { mutableStateOf("") }
         var retry: Boolean by remember { mutableStateOf(false) }
+        val scope = rememberCoroutineScope()
 
         if (!isLoading) {
             Button(
@@ -201,21 +206,32 @@ class RegisterDeviceScreen: InternalScreen() {
                         )
 
                         provisionDevice.verify (
-                            onDeviceVerify = { state: VerifyDeviceState, message: String ->
-                                infoMessage = message
-                                isLoading = false
+                            onSuccess = { message: String ->
+                                scope.launch {
+                                    val response = RetrofitClient.getAPI(context).registerDevice(
+                                        DeviceRegistration (
+                                            databasePassword = SettingsDatastore(context).getServerPassword(),
+                                            deviceUsername = provisionDevice.getUsername(),
+                                            devicePassword = provisionDevice.getPassword()
 
-                                when (state) {
-                                    VerifyDeviceState.VALID -> {
+                                        )
+                                    )
+
+                                    if (response.isSuccessful) {
                                         onReceiveProvisionDevice(provisionDevice)
-                                    }
-                                    VerifyDeviceState.TIMEOUT -> {
+                                        infoMessage = message
+                                    } else {
+                                        infoMessage = "Error: device registration failed | " + response.code()
                                         retry = true
                                     }
-                                    VerifyDeviceState.INVALID  -> {
-                                        retry = false
-                                    }
+
+                                    isLoading = false
                                 }
+                            },
+
+                            onFailure = { message: String ->
+                                infoMessage = message
+                                retry = true
                             }
                         )
                     }

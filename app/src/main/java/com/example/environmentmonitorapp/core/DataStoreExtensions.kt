@@ -37,14 +37,14 @@ class SettingsDatastore(private val context: Context) {
         }
     }
 
-    suspend fun getServerURL(): String? {
+    suspend fun getServerURL(): String {
         val preferences = context.dataStore.data.first()
 
-        return preferences[SERVER_URL]
+        return preferences[SERVER_URL]!!
     }
 
 
-    suspend fun getServerPassword(): String? {
+    suspend fun getServerPassword(): String {
         val preferences = context.dataStore.data.first()
 
         val cipherText = Base64.decode(preferences[SERVER_PASSWORD], Base64.DEFAULT)
