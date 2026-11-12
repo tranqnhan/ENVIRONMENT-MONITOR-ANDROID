@@ -9,5 +9,5 @@ interface ApiService {
     suspend fun authConnection(@Body auth: AuthRequest): Response<Void>
 
     @POST("device/register")
-    fun registerDevice(@Body deviceRegistration: DeviceRegistration): Response<String>
+    suspend fun registerMonitorDevice(@Body monitorDeviceRegistration: MonitorDeviceRegistration): Response<String>
 }

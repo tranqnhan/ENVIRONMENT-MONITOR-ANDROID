@@ -33,7 +33,7 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
     var monitorDevice: ESPDevice? = null;
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun connect(context: Context, proofOfPossession: String): Boolean {
+    fun connect(context: Context, proofOfPossession: String) {
         this.monitorDevice = ESPProvisionManager.getInstance(context)
             .createESPDevice(
                 ESPConstants.TransportType.TRANSPORT_BLE,
@@ -44,8 +44,6 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
 
         this.monitorDevice?.userName = this.bluetoothDevice.name
         this.monitorDevice?.proofOfPossession = proofOfPossession
-
-        return true;
     }
 
     fun verify(onSuccess: (message: String) -> Unit, onFailure: (message: String) -> Unit) {

@@ -37,13 +37,12 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.environmentmonitorapp.api.DeviceRegistration
+import com.example.environmentmonitorapp.api.MonitorDeviceRegistration
 import com.example.environmentmonitorapp.api.RetrofitClient
 import com.example.environmentmonitorapp.core.BluetoothScanState
 import com.example.environmentmonitorapp.core.BluetoothScanner
 import com.example.environmentmonitorapp.core.ProvisionDevice
 import com.example.environmentmonitorapp.core.SettingsDatastore
-import com.example.environmentmonitorapp.core.VerifyDeviceState
 import kotlinx.coroutines.launch
 
 class RegisterDeviceScreen: InternalScreen() {
@@ -189,7 +188,6 @@ class RegisterDeviceScreen: InternalScreen() {
         }
         var isLoading by remember { mutableStateOf(false) }
         var infoMessage by remember { mutableStateOf("") }
-        var retry: Boolean by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
 
         if (!isLoading) {
@@ -199,42 +197,39 @@ class RegisterDeviceScreen: InternalScreen() {
                     isLoading = true
                     infoMessage = ""
 
-                    if (!retry) {
-                        provisionDevice.connect(
-                            context = context,
-                            proofOfPossession = proofOfPossession,
-                        )
+                    provisionDevice.connect(
+                        context = context,
+                        proofOfPossession = proofOfPossession,
+                    )
 
-                        provisionDevice.verify (
-                            onSuccess = { message: String ->
-                                scope.launch {
-                                    val response = RetrofitClient.getAPI(context).registerDevice(
-                                        DeviceRegistration (
-                                            databasePassword = SettingsDatastore(context).getServerPassword(),
-                                            deviceUsername = provisionDevice.getUsername(),
-                                            devicePassword = provisionDevice.getPassword()
+                    provisionDevice.verify (
+                        onSuccess = { message: String ->
+                            scope.launch {
+                                val response = RetrofitClient.getAPI(context).registerMonitorDevice(
+                                    MonitorDeviceRegistration (
+                                        databasePassword = SettingsDatastore(context).getServerPassword(),
+                                        deviceUsername = provisionDevice.getUsername(),
+                                        devicePassword = provisionDevice.getPassword()
 
-                                        )
                                     )
+                                )
 
-                                    if (response.isSuccessful) {
-                                        onReceiveProvisionDevice(provisionDevice)
-                                        infoMessage = message
-                                    } else {
-                                        infoMessage = "Error: device registration failed | " + response.code()
-                                        retry = true
-                                    }
-
-                                    isLoading = false
+                                if (response.isSuccessful) {
+                                    onReceiveProvisionDevice(provisionDevice)
+                                    infoMessage = message
+                                } else {
+                                    infoMessage = "Error: device registration failed | " + response.code()
                                 }
-                            },
 
-                            onFailure = { message: String ->
-                                infoMessage = message
-                                retry = true
+                                isLoading = false
                             }
-                        )
-                    }
+                        },
+
+                        onFailure = { message: String ->
+                            infoMessage = message
+                        }
+                    )
+
                 },
                 interactionSource = interactionSource,
                 modifier = Modifier.fillMaxWidth(),
@@ -244,7 +239,7 @@ class RegisterDeviceScreen: InternalScreen() {
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Text(text = if (retry) "RETRY" else "SUBMIT")
+                Text("SUBMIT")
             }
 
             Text(infoMessage)

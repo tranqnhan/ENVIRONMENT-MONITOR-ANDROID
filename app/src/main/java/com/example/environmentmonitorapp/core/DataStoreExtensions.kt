@@ -2,6 +2,7 @@ package com.example.environmentmonitorapp.core
 
 import android.content.Context
 import android.util.Base64
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import okio.ByteString.Companion.toByteString
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
+import javax.crypto.spec.GCMParameterSpec
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -40,6 +42,11 @@ class SettingsDatastore(private val context: Context) {
     suspend fun getServerURL(): String {
         val preferences = context.dataStore.data.first()
 
+        if (preferences[SERVER_URL] == null) {
+            Log.e("DATASTORE", "server url is not set")
+            return ""
+        }
+
         return preferences[SERVER_URL]!!
     }
 
@@ -47,14 +54,19 @@ class SettingsDatastore(private val context: Context) {
     suspend fun getServerPassword(): String {
         val preferences = context.dataStore.data.first()
 
+        if (preferences[SERVER_PASSWORD] == null || preferences[SERVER_PASSWORD_IV] == null) {
+            Log.e("DATASTORE", "server password is not set")
+            return ""
+        }
+
         val cipherText = Base64.decode(preferences[SERVER_PASSWORD], Base64.DEFAULT)
         val iv = Base64.decode(preferences[SERVER_PASSWORD_IV], Base64.DEFAULT)
 
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING")
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
             Cipher.DECRYPT_MODE,
             EncryptionKey.getOrCreateKey(),
-            IvParameterSpec(iv)
+            GCMParameterSpec(128, iv)
         )
         return Base64.encodeToString(cipher.doFinal(cipherText), Base64.NO_WRAP)
     }

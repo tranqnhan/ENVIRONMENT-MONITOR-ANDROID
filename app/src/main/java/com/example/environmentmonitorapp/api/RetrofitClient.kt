@@ -15,7 +15,7 @@ object RetrofitClient {
     suspend fun getAPI(context: Context): ApiService {
         val baseUrl = SettingsDatastore(context).getServerURL()
 
-        require(!baseUrl.isNullOrBlank()) {
+        require(baseUrl.isNotBlank()) {
             "Server URL must be set in datastore"
         }
 

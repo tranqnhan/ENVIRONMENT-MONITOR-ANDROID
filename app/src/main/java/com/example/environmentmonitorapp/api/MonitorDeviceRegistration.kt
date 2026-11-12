@@ -1,8 +1,6 @@
 package com.example.environmentmonitorapp.api
 
-import java.time.Instant
-
-data class DeviceRegistration (
+data class MonitorDeviceRegistration (
     val databasePassword: String,
     val deviceUsername: String,
     val devicePassword: String,
