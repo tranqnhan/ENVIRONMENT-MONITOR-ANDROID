@@ -44,6 +44,7 @@ import com.example.environmentmonitorapp.core.BluetoothScanner
 import com.example.environmentmonitorapp.core.ProvisionDevice
 import com.example.environmentmonitorapp.core.SettingsDatastore
 import kotlinx.coroutines.launch
+import okio.IOException
 
 class RegisterDeviceScreen: InternalScreen() {
     init {
@@ -76,7 +77,7 @@ class RegisterDeviceScreen: InternalScreen() {
             if (provisionDevice == null) {
                 BluetoothScan( onReceiveProvisionDevice = { provisionDevice = it; })
             } else {
-                WifiProvision(provisionDevice!!)
+                DataProvision(provisionDevice!!)
             }
         }
 
@@ -205,21 +206,25 @@ class RegisterDeviceScreen: InternalScreen() {
                     provisionDevice.verify (
                         onSuccess = { message: String ->
                             scope.launch {
-                                val response = RetrofitClient.getAPI(context).registerMonitorDevice(
-                                    MonitorDeviceRegistration (
-                                        databasePassword = SettingsDatastore(context).getServerPassword(),
-                                        deviceUsername = provisionDevice.getUsername(),
-                                        devicePassword = provisionDevice.getPassword()
-
+                                try {
+                                    val response = RetrofitClient.getAPI(context).registerMonitorDevice(
+                                        MonitorDeviceRegistration (
+                                            serverAdminPassword = SettingsDatastore(context).getServerPassword(),
+                                            monitorDeviceUsername = provisionDevice.getUsername(),
+                                            monitorDevicePassword = provisionDevice.getPassword()
+                                        )
                                     )
-                                )
+                                    if (response.isSuccessful) {
+                                        onReceiveProvisionDevice(provisionDevice)
+                                        infoMessage = message
+                                    } else {
+                                        infoMessage = "Error: device registration failed | " + response.code()
+                                    }
 
-                                if (response.isSuccessful) {
-                                    onReceiveProvisionDevice(provisionDevice)
-                                    infoMessage = message
-                                } else {
-                                    infoMessage = "Error: device registration failed | " + response.code()
+                                } catch (e: IOException) {
+                                    infoMessage = "Error: " + e.message
                                 }
+
 
                                 isLoading = false
                             }
@@ -227,6 +232,7 @@ class RegisterDeviceScreen: InternalScreen() {
 
                         onFailure = { message: String ->
                             infoMessage = message
+                            isLoading = false
                         }
                     )
 
@@ -342,7 +348,7 @@ class RegisterDeviceScreen: InternalScreen() {
     }
 
     @Composable
-    fun WifiProvision(provisionDevice: ProvisionDevice) {
+    fun DataProvision(provisionDevice: ProvisionDevice) {
         var ssid by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
 

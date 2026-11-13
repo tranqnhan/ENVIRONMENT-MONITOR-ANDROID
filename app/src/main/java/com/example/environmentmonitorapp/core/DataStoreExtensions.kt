@@ -68,6 +68,6 @@ class SettingsDatastore(private val context: Context) {
             EncryptionKey.getOrCreateKey(),
             GCMParameterSpec(128, iv)
         )
-        return Base64.encodeToString(cipher.doFinal(cipherText), Base64.NO_WRAP)
+        return String(cipher.doFinal(cipherText), Charsets.UTF_8)
     }
 }

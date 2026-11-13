@@ -1,7 +1,7 @@
 package com.example.environmentmonitorapp.api
 
 data class MonitorDeviceRegistration (
-    val databasePassword: String,
-    val deviceUsername: String,
-    val devicePassword: String,
+    val serverAdminPassword: String,
+    val monitorDeviceUsername: String,
+    val monitorDevicePassword: String,
 )

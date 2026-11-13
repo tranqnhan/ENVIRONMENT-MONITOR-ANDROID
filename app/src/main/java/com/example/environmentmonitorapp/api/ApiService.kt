@@ -6,8 +6,8 @@ import retrofit2.http.POST
 
 interface ApiService {
     @POST("server/auth")
-    suspend fun authConnection(@Body auth: AuthRequest): Response<Void>
+    suspend fun authConnection(@Body auth: AuthRequest): Response<Unit>
 
     @POST("device/register")
-    suspend fun registerMonitorDevice(@Body monitorDeviceRegistration: MonitorDeviceRegistration): Response<String>
+    suspend fun registerMonitorDevice(@Body monitorDeviceRegistration: MonitorDeviceRegistration): Response<Unit>
 }
