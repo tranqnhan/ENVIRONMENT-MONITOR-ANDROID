@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,11 +47,21 @@ class RegisterServerScreen: InternalScreen() {
     override fun Display() {
         var success by remember { mutableStateOf(false) }
 
+        val context = LocalContext.current
+        var serverURL by remember { mutableStateOf("")}
+
+        LaunchedEffect(Unit) {
+            serverURL = SettingsDatastore(context).getServerURL()
+        }
+
         Column (
             modifier = Modifier
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (serverURL.isNotBlank()) {
+                Text("Current server: $serverURL")
+            }
             Text("Connect to a Server")
             if (success) {
                 Text("Success: Server credentials registered.")

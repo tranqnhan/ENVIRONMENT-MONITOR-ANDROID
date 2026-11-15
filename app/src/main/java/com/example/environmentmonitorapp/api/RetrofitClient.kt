@@ -21,7 +21,7 @@ object RetrofitClient {
 
         if (serverURL != baseUrl) {
             api = Retrofit.Builder()
-                .baseUrl(normalizeBaseUrl(baseUrl, defaultScheme = "https"))
+                .baseUrl(normalizeBaseUrl(baseUrl))
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
                 .create(ApiService::class.java)
@@ -35,10 +35,9 @@ object RetrofitClient {
         require(baseUrl.isNotBlank()) {
             "Server URL must not be blank"
         }
-        Log.e("BASE URL", normalizeBaseUrl(baseUrl, defaultScheme = "https"))
         if (serverURL != baseUrl) {
             api = Retrofit.Builder()
-                .baseUrl(normalizeBaseUrl(baseUrl, defaultScheme = "https"))
+                .baseUrl(normalizeBaseUrl(baseUrl))
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
                 .create(ApiService::class.java)
@@ -67,4 +66,5 @@ object RetrofitClient {
 
         return withScheme.trimEnd('/') + "/"
     }
+
 }

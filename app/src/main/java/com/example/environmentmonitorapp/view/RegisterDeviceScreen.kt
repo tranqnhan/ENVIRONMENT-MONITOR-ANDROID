@@ -11,12 +11,14 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +37,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.environmentmonitorapp.api.MonitorDeviceRegistration
@@ -53,31 +57,48 @@ class RegisterDeviceScreen: InternalScreen() {
 
     @Composable
     override fun Display() {
+        val context = LocalContext.current
+        var serverURL by remember { mutableStateOf("")}
+        var isServerURLLoaded by remember { mutableStateOf(false) }
+
         Column (
             modifier = Modifier
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Register a monitor device")
+            if (serverURL.isNotBlank()) {
+                Text("Server URL: $serverURL")
+                Text("Register a monitor device")
 
-            var permissionGranted by remember {
-                mutableStateOf(false)
-            }
-
-            BluetoothPermissionCheck(
-                onPermissionGranted = {
-                    permissionGranted = it
+                var permissionGranted by remember {
+                    mutableStateOf(false)
                 }
-            )
 
-            if (!permissionGranted) return
+                BluetoothPermissionCheck(
+                    onPermissionGranted = {
+                        permissionGranted = it
+                    }
+                )
 
-            var provisionDevice: ProvisionDevice? by remember { mutableStateOf(null)}
+                if (!permissionGranted) return
 
-            if (provisionDevice == null) {
-                BluetoothScan( onReceiveProvisionDevice = { provisionDevice = it; })
+                var provisionDevice: ProvisionDevice? by remember { mutableStateOf(null) }
+
+                if (provisionDevice == null) {
+                    BluetoothScan(onReceiveProvisionDevice = { provisionDevice = it; })
+                } else {
+                    DataProvision(provisionDevice!!)
+                }
             } else {
-                DataProvision(provisionDevice!!)
+                if (isServerURLLoaded) {
+                    Text("Server is not registered.")
+                } else {
+                    Text("Loading server url...")
+                    LaunchedEffect(Unit) {
+                        serverURL = SettingsDatastore(context).getServerURL()
+                        isServerURLLoaded = true
+                    }
+                }
             }
         }
 
@@ -170,7 +191,7 @@ class RegisterDeviceScreen: InternalScreen() {
         Text("Device Name: " + provisionDevice.bluetoothDevice.name)
 
         var proofOfPossession by remember { mutableStateOf("") }
-
+        var showPassword by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = proofOfPossession,
             onValueChange = {
@@ -178,8 +199,20 @@ class RegisterDeviceScreen: InternalScreen() {
             },
             label = { Text("PoP Code") },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
         )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = showPassword,
+                onCheckedChange = { showPassword = it }
+            )
+
+            Text("Show password")
+        }
 
         val interactionSource = remember { MutableInteractionSource() }
         val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
@@ -349,70 +382,107 @@ class RegisterDeviceScreen: InternalScreen() {
 
     @Composable
     fun DataProvision(provisionDevice: ProvisionDevice) {
-        var ssid by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-
-        OutlinedTextField(
-            value = ssid,
-            onValueChange = {
-                ssid = it
-            },
-            label = { Text("Wi-Fi SSID") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        OutlinedTextField(
-            value = password,
-            onValueChange = {
-                password = it
-            },
-            label = { Text("Password") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-
-        val interactionSource = remember { MutableInteractionSource() }
-        val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
-        val scanButtonColor = when {
-            scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.primary
-        }
-
+        var isProvisioned by remember { mutableStateOf(false) }
         var statusText by remember { mutableStateOf("") }
-        var isLoading by remember {mutableStateOf(false)}
 
-        if (!isLoading) {
-            Button(
-                enabled = ssid.isNotEmpty(),
-                onClick = {
-                    isLoading = true
-                    provisionDevice.provisionWifi(
-                        ssid,
-                        password,
-                        onProvisionComplete = { result ->
-                            statusText += "\n" + result.message
-                            isLoading = false
-                        })
+        if (!isProvisioned) {
+            var ssid by remember { mutableStateOf("") }
+            var password by remember { mutableStateOf("") }
+
+            OutlinedTextField(
+                value = ssid,
+                onValueChange = {
+                    ssid = it
                 },
-                interactionSource = interactionSource,
+                label = { Text("Wi-Fi SSID") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            var showPassword by remember { mutableStateOf(false) }
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                },
+                label = { Text("Password") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RectangleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = scanButtonColor,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation()
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("SUBMIT")
+                Checkbox(
+                    checked = showPassword,
+                    onCheckedChange = { showPassword = it }
+                )
+
+                Text("Show password")
             }
 
-        } else {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+            val interactionSource = remember { MutableInteractionSource() }
+            val scanButtonIsPressed by interactionSource.collectIsPressedAsState()
+            val scanButtonColor = when {
+                scanButtonIsPressed -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.primary
+            }
+
+            var isLoading by remember {mutableStateOf(false)}
+            val context = LocalContext.current
+            val scope = rememberCoroutineScope()
+
+            if (!isLoading) {
+                Button(
+                    enabled = ssid.isNotEmpty(),
+                    onClick = {
+                        isLoading = true
+
+                        scope.launch {
+                            provisionDevice.provisionServerUrl(
+                                SettingsDatastore(context).getServerURL(),
+                                onSuccess = {
+                                    provisionDevice.provisionWifi(
+                                        ssid,
+                                        password,
+                                        onSuccess = {
+                                            statusText = "Success: Device successfully provisioned"
+                                            isProvisioned = true
+                                            isLoading = false
+                                        },
+                                        onFailure = { errorMessage ->
+                                            statusText = "Failure: $errorMessage"
+                                            isLoading = false
+                                        }
+                                    )
+                                },
+                                onFailure = { errorMessage ->
+                                    statusText = "Failure: $errorMessage"
+                                    isLoading = false
+                                }
+                            )
+                        }
+                    },
+                    interactionSource = interactionSource,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = scanButtonColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("SUBMIT")
+                }
+
+            } else {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
         }
 

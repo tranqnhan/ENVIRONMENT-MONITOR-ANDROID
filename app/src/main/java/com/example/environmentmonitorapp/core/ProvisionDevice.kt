@@ -15,19 +15,12 @@ import com.espressif.provisioning.listeners.ResponseListener
 import java.lang.Exception
 
 
-
-data class WifiProvisionResult (
-    val status: Boolean,
-    val message: String
-)
-
-
 /*
     STAGES:
-        1. connect
-        2. verify
-        3. provisionWifi
- */
+    1. connect
+    2. verify
+    3. provisionWifi
+*/
 
 class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUuid: String) {
     var monitorDevice: ESPDevice? = null;
@@ -74,7 +67,7 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
                     handler.postDelayed(this, 100)
                 } else {
                     Log.e("ESP", "Timed out waiting for versionInfo")
-                    onFailure("Failure: Timed out waiting for versionInfo")
+                    onFailure("Failure: Timed out waiting for versionInfo. Please retry.")
                 }
             }
         }
@@ -82,19 +75,42 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
         handler.post(checkVersionInfo)
     }
 
+    fun provisionServerUrl(
+        serverUrl: String,
+        onSuccess: () -> Unit,
+        onFailure: (message: String) -> Unit
+    ) {
+        this.monitorDevice?.sendDataToCustomEndPoint(
+            "server-url",
+            serverUrl.toByteArray(Charsets.UTF_8),
+            object : ResponseListener {
+                override fun onSuccess(returnData: ByteArray) {
+                    val reply = String(returnData, Charsets.UTF_8)
+                    Log.e("REPLY", reply);
+                    if (reply == "OK") {
+                        onSuccess()
+                    } else {
+                        onFailure("Device did not acknowledge the server URL")
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    onFailure(e.toString())
+                }
+            }
+        )
+    }
+
     fun provisionWifi(
         ssid: String,
         password: String,
-        onProvisionComplete: (result: WifiProvisionResult) -> Unit
+        onSuccess: () -> Unit,
+        onFailure: (message: String) -> Unit
     ) {
         this.monitorDevice?.provision(ssid,password,
             object: ProvisionListener {
                 override fun createSessionFailed(p0: Exception?) {
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            false, "Failure: Create session failed"
-                        )
-                    )
+                    onFailure("Create session failed" + p0?.let{ ". Reason: ${p0.message}"})
                 }
 
                 override fun wifiConfigSent() {
@@ -102,12 +118,7 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
                 }
 
                 override fun wifiConfigFailed(p0: Exception?) {
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            false,
-                            "Failure: Wi-Fi configurations failed" + p0?.let { ". Reason: " + p0.message }
-                        )
-                    )
+                    onFailure("Wi-Fi configurations failed" + p0?.let { ". Reason: ${p0.message}"})
                 }
 
                 override fun wifiConfigApplied() {
@@ -115,45 +126,25 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
                 }
 
                 override fun wifiConfigApplyFailed(p0: Exception?) {
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            false,
-                            "Failure: Wi-Fi apply configurations failed" + p0?.let { ". Reason: " + p0.message }
-                        )
-                    )
+                    onFailure("Wi-Fi apply configurations failed" + p0?.let { ". Reason: ${p0.message}" })
                 }
 
                 override fun provisioningFailedFromDevice(p0: ESPConstants.ProvisionFailureReason?) {
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            false,
-                            "Failure: Device failure" + p0?.let { ". Reason: $p0" }
-                        )
-                    )
+                    onFailure("Device failure" + p0?.let { ". Reason: $p0" })
                 }
 
                 override fun deviceProvisioningSuccess() {
                     if (monitorDevice?.versionInfo == null) {
-                        Log.d("VERSION INFO", "it is null")
+                        Log.d("VERSION INFO", "version info is null")
                     } else {
                         Log.d("VERSION INFO", monitorDevice!!.versionInfo)
                     }
 
-
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            true, "Success: Device successfully provisioned"
-                        )
-                    )
+                    onSuccess()
                 }
 
                 override fun onProvisioningFailed(p0: Exception?) {
-                    onProvisionComplete(
-                        WifiProvisionResult(
-                            false,
-                            "Failure: Provisioning failure" + p0?.let { ". Reason: $p0" }
-                        )
-                    )
+                    onFailure("Provisioning failure" + p0?.let { ". Reason: ${p0.printStackTrace()}" })
                 }
 
             }

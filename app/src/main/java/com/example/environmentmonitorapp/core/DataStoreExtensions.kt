@@ -7,8 +7,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.environmentmonitorapp.api.RetrofitClient
 import kotlinx.coroutines.flow.first
 import okio.ByteString.Companion.toByteString
+import retrofit2.Retrofit
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.GCMParameterSpec
@@ -32,7 +34,7 @@ class SettingsDatastore(private val context: Context) {
 
         context.dataStore.updateData {
             it.toMutablePreferences().also { preferences ->
-                preferences[SERVER_URL] = serverURL
+                preferences[SERVER_URL] = RetrofitClient.normalizeBaseUrl(serverURL)
                 preferences[SERVER_PASSWORD] = Base64.encodeToString(cipherText, Base64.NO_WRAP)
                 preferences[SERVER_PASSWORD_IV] = Base64.encodeToString(iv, Base64.NO_WRAP)
             }
@@ -70,4 +72,6 @@ class SettingsDatastore(private val context: Context) {
         )
         return String(cipher.doFinal(cipherText), Charsets.UTF_8)
     }
+
+
 }
