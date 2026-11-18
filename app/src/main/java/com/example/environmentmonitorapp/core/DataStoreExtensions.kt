@@ -9,10 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.environmentmonitorapp.api.RetrofitClient
 import kotlinx.coroutines.flow.first
-import okio.ByteString.Companion.toByteString
-import retrofit2.Retrofit
 import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.GCMParameterSpec
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -34,14 +31,20 @@ class SettingsDatastore(private val context: Context) {
 
         context.dataStore.updateData {
             it.toMutablePreferences().also { preferences ->
-                preferences[SERVER_URL] = RetrofitClient.normalizeBaseUrl(serverURL)
+                preferences[SERVER_URL] = serverURL
                 preferences[SERVER_PASSWORD] = Base64.encodeToString(cipherText, Base64.NO_WRAP)
                 preferences[SERVER_PASSWORD_IV] = Base64.encodeToString(iv, Base64.NO_WRAP)
             }
         }
     }
 
-    suspend fun getServerURL(): String {
+    suspend fun isServerURLExist(): Boolean {
+        val preferences = context.dataStore.data.first()
+
+        return preferences[SERVER_URL] != null
+    }
+
+    suspend fun getHTTPSServerURL(): String {
         val preferences = context.dataStore.data.first()
 
         if (preferences[SERVER_URL] == null) {
@@ -49,9 +52,19 @@ class SettingsDatastore(private val context: Context) {
             return ""
         }
 
-        return preferences[SERVER_URL]!!
+        return TransformURL.normalizeBaseURL(preferences[SERVER_URL]!!, "https")
     }
 
+    suspend fun getWSSServerURL(): String {
+        val preferences = context.dataStore.data.first()
+
+        if (preferences[SERVER_URL] == null) {
+            Log.e("DATASTORE", "server url is not set")
+            return ""
+        }
+
+        return TransformURL.normalizeBaseURL(preferences[SERVER_URL]!!, "wss")
+    }
 
     suspend fun getServerPassword(): String {
         val preferences = context.dataStore.data.first()

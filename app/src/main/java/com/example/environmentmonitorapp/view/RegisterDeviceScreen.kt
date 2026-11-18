@@ -95,7 +95,7 @@ class RegisterDeviceScreen: InternalScreen() {
                 } else {
                     Text("Loading server url...")
                     LaunchedEffect(Unit) {
-                        serverURL = SettingsDatastore(context).getServerURL()
+                        serverURL = SettingsDatastore(context).getHTTPSServerURL()
                         isServerURLLoaded = true
                     }
                 }
@@ -442,7 +442,7 @@ class RegisterDeviceScreen: InternalScreen() {
 
                         scope.launch {
                             provisionDevice.provisionServerUrl(
-                                SettingsDatastore(context).getServerURL(),
+                                SettingsDatastore(context).getHTTPSServerURL(),
                                 onSuccess = {
                                     provisionDevice.provisionWifi(
                                         ssid,

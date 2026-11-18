@@ -51,7 +51,7 @@ class RegisterServerScreen: InternalScreen() {
         var serverURL by remember { mutableStateOf("")}
 
         LaunchedEffect(Unit) {
-            serverURL = SettingsDatastore(context).getServerURL()
+            serverURL = SettingsDatastore(context).getHTTPSServerURL()
         }
 
         Column (
