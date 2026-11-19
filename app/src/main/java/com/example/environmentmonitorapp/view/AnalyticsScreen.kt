@@ -37,7 +37,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.example.environmentmonitorapp.api.CurrentEnvironmentUpdateClient
+import com.example.environmentmonitorapp.api.EnvironmentUpdateClient
 import com.example.environmentmonitorapp.api.EnvironmentDataPoint
 import com.example.environmentmonitorapp.api.EnvironmentDataRange
 import com.example.environmentmonitorapp.components.EnvironmentCard
@@ -45,6 +45,8 @@ import com.example.environmentmonitorapp.components.EnvironmentChart
 import com.example.environmentmonitorapp.components.EnvironmentDataColor
 import com.example.environmentmonitorapp.components.EnvironmentDataType
 import com.example.environmentmonitorapp.core.SettingsDatastore
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -140,7 +142,7 @@ class AnalyticsScreen: InternalScreen() {
     @Composable
     fun LoadAnalytics(monitorDeviceUsername: String) {
         val context = LocalContext.current
-        val client = remember { CurrentEnvironmentUpdateClient() }
+        val client = remember { EnvironmentUpdateClient() }
         var currentData by remember { mutableStateOf<EnvironmentDataPoint?>(null) }
         var dataHistory by remember { mutableStateOf<List<EnvironmentDataPoint>>(emptyList())}
         var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -172,9 +174,19 @@ class AnalyticsScreen: InternalScreen() {
                     dataHistory = environmentDataHistoryResponse.body()!!
                 }
 
-                client.listen(context, monitorDeviceUsername) { update ->
-                    currentData = update
-                    isConnect = true
+                coroutineScope {
+                    launch {
+                        client.listen(context, "current", monitorDeviceUsername) { update ->
+                            currentData = update
+                            isConnect = true
+                        }
+                    }
+
+                    launch {
+                        client.listen(context, "history", monitorDeviceUsername) { update ->
+                            dataHistory = dataHistory + update
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 isConnect = false

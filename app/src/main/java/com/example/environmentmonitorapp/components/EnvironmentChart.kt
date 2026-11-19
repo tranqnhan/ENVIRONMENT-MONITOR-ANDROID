@@ -3,6 +3,7 @@ package com.example.environmentmonitorapp.components
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +17,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.environmentmonitorapp.api.EnvironmentDataPoint
+import com.patrykandpatrick.vico.compose.cartesian.AutoScrollCondition
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.Scroll
 import com.patrykandpatrick.vico.compose.cartesian.Zoom
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
@@ -29,8 +32,10 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.LineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLine
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
 import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.data.ExtraStore
 import java.util.Date
 import kotlin.math.roundToInt
@@ -51,7 +56,7 @@ fun EnvironmentChart(
 
     val modelProducer = remember { CartesianChartModelProducer() }
 
-    val axisFormatter = remember {
+    val axisFormatter = remember(context) {
         CartesianValueFormatter { _, value, _ ->
             // Assumes your x-values are epoch seconds.
             val date = Date((value * 1_000).toLong())
@@ -64,16 +69,14 @@ fun EnvironmentChart(
     }
 
     LaunchedEffect(environmentDataPoints) {
-        val sortedPoints = environmentDataPoints.sortedBy { it.measuredAt }
-
         modelProducer.runTransaction {
             lineModel {
                 series(
-                    x = sortedPoints.map {
+                    x = environmentDataPoints.map {
                         it.measuredAt.epochSecond.toDouble() +
                                 it.measuredAt.nano / 1_000_000_000.0
                     },
-                    y = sortedPoints.map {
+                    y = environmentDataPoints.map {
                         when (dataType) {
                             EnvironmentDataType.TEMPERATURE -> it.temperature
                             EnvironmentDataType.CO2 -> it.co2Level
@@ -114,9 +117,18 @@ fun EnvironmentChart(
                     LineCartesianLayer.rememberLine(
                         fill = LineCartesianLayer.LineFill.single(
                             Fill(EnvironmentDataColor[dataType]!!)
-                        )
+                        ),
+                        pointProvider = LineCartesianLayer.PointProvider.single(
+                            LineCartesianLayer.Point(
+                                rememberShapeComponent(
+                                    fill = Fill(EnvironmentDataColor[dataType]!!),
+                                    shape = CircleShape
+                                )
+                            )
+                        ),
                     )
                 ),
+
                 rangeProvider = rangeProvider
             ),
             startAxis =
@@ -141,10 +153,15 @@ fun EnvironmentChart(
                 ),
                 itemPlacer = remember {
                     HorizontalAxis.ItemPlacer.aligned(
-                        spacing = { 5 }
+                        spacing = { 50 }
                     )
                 }
             )
+        ),
+        scrollState = rememberVicoScrollState(
+            initialScroll = Scroll.Absolute.Start,
+            autoScroll = Scroll.Absolute.End,
+            autoScrollCondition = AutoScrollCondition.OnModelGrowth
         ),
         zoomState = rememberVicoZoomState(
             initialZoom = Zoom.Content
