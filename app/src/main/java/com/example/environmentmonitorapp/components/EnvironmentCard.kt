@@ -22,15 +22,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.environmentmonitorapp.api.CurrentEnvironmentUpdateGet
+import com.example.environmentmonitorapp.api.EnvironmentDataPoint
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+
 @Composable
 fun EnvironmentCard(
     monitorDeviceName: String,
-    data: CurrentEnvironmentUpdateGet,
+    data: EnvironmentDataPoint,
+    isConnect: Boolean,
     modifier: Modifier = Modifier
 ) {
     val measuredTime = DateTimeFormatter
@@ -46,11 +48,18 @@ fun EnvironmentCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = monitorDeviceName,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatusCircleLight(if (isConnect) Color(0xFF22C55E) else Color(0xFFEF4444))
+
+                Text(
+                    text = monitorDeviceName,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
 
             HorizontalDivider()
 
@@ -61,7 +70,7 @@ fun EnvironmentCard(
                     "%.1f °C",
                     data.temperature
                 ),
-                color = Color(0xFFFFAB91)
+                color = EnvironmentDataColor[EnvironmentDataType.TEMPERATURE]!!
             )
 
             EnvironmentReading(
@@ -71,13 +80,13 @@ fun EnvironmentCard(
                     "%.1f %%",
                     data.humidity
                 ),
-                color = Color(0xFF90CAF9)
+                color = EnvironmentDataColor[EnvironmentDataType.HUMIDITY]!!
             )
 
             EnvironmentReading(
                 label = "CO₂",
                 value = "${data.co2Level} ppm",
-                color = Color(0xFFCE93D8)
+                color = EnvironmentDataColor[EnvironmentDataType.CO2]!!
             )
 
             HorizontalDivider()

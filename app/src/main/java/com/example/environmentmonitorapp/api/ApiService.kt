@@ -4,6 +4,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("server/auth")
@@ -14,4 +15,10 @@ interface ApiService {
 
     @GET("device/usernames")
     suspend fun getAllMonitorDeviceUsernames(): Response<List<String>>
+
+    @GET("data/current")
+    suspend fun getCurrentEnvironmentData(@Query("monitorDeviceUsername") monitorDeviceUsername: String): Response<EnvironmentDataPoint>
+
+    @POST("data/range")
+    suspend fun getEnvironmentDataHistory(@Body environmentDataRange: EnvironmentDataRange): Response<List<EnvironmentDataPoint>>
 }
