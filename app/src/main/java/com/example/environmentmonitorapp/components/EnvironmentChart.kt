@@ -173,6 +173,6 @@ fun EnvironmentChart(
         modelProducer = modelProducer,
         modifier = Modifier
             .fillMaxWidth()
-            .height(320.dp)
+            .height(180.dp)
     )
 }
