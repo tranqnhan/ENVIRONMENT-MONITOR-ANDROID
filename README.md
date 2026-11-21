@@ -12,4 +12,4 @@ Things that the app do:
 
 ### Analytics View
 
-![analytics page of environment monitor app](EnvironmentMonitorApp.png)
+![analytics page of environment monitor app](docs/EnvironmentMonitorApp.png)
