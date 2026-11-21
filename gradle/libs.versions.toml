@@ -51,6 +51,7 @@ krossbow-stomp-core = { module = "org.hildan.krossbow:krossbow-stomp-core", vers
 krossbow-websocket-okhttp = { module = "org.hildan.krossbow:krossbow-websocket-okhttp", version.ref = "krossbowWebsocketOkhttp" }
 moshi-kotlin = { module = "com.squareup.moshi:moshi-kotlin", version.ref = "moshiKotlin" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+retrofit-scalars = { module = "com.squareup.retrofit2:converter-scalars", version.ref = "retrofit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

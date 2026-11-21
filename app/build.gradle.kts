@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.converter.moshi)
     implementation(libs.compose)
     implementation(libs.compose.m3)
+    implementation(libs.retrofit.scalars)
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.datastore.preferences.core)

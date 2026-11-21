@@ -11,7 +11,7 @@ interface ApiService {
     suspend fun authConnection(@Body auth: AuthRequest): Response<Unit>
 
     @POST("device/register")
-    suspend fun registerMonitorDevice(@Body monitorDeviceRegistration: MonitorDeviceRegistration): Response<Unit>
+    suspend fun registerMonitorDevice(@Body monitorDeviceRegistration: MonitorDeviceRegistration): Response<String>
 
     @GET("device/usernames")
     suspend fun getAllMonitorDeviceUsernames(): Response<List<String>>

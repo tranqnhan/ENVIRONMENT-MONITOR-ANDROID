@@ -12,7 +12,9 @@ import com.espressif.provisioning.ESPDevice
 import com.espressif.provisioning.ESPProvisionManager
 import com.espressif.provisioning.listeners.ProvisionListener
 import com.espressif.provisioning.listeners.ResponseListener
+import kotlinx.coroutines.suspendCancellableCoroutine
 import java.lang.Exception
+import kotlin.coroutines.resumeWithException
 
 
 /*
@@ -23,7 +25,8 @@ import java.lang.Exception
 */
 
 class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUuid: String) {
-    var monitorDevice: ESPDevice? = null;
+    var monitorDevice: ESPDevice? = null
+    var registerUsername: String? = null
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(context: Context, proofOfPossession: String) {
@@ -101,6 +104,31 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
         )
     }
 
+    fun provisionUsername(
+        onSuccess: () -> Unit,
+        onFailure: (message: String) -> Unit
+    ) {
+        this.monitorDevice?.sendDataToCustomEndPoint(
+            "username",
+            registerUsername?.toByteArray(Charsets.UTF_8),
+            object : ResponseListener {
+                override fun onSuccess(returnData: ByteArray) {
+                    val reply = String(returnData, Charsets.UTF_8)
+                    Log.e("REPLY", reply);
+                    if (reply == "OK") {
+                        onSuccess()
+                    } else {
+                        onFailure("Device did not acknowledge the username")
+                    }
+                }
+
+                override fun onFailure(e: Exception) {
+                    onFailure(e.toString() + ". " + e.stackTrace.contentToString())
+                }
+            }
+        )
+    }
+
     fun provisionWifi(
         ssid: String,
         password: String,
@@ -144,7 +172,7 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
                 }
 
                 override fun onProvisioningFailed(p0: Exception?) {
-                    onFailure("Provisioning failure" + p0?.let { ". Reason: ${p0.printStackTrace()}" })
+                    onFailure("Provisioning failure" + p0?.let { ". Reason: ${p0.stackTrace.contentToString()}" })
                 }
 
             }
@@ -160,4 +188,27 @@ class ProvisionDevice(val bluetoothDevice: BluetoothDevice, val primaryServiceUu
         return monitorDevice!!.proofOfPossession
     }
 
+    suspend fun awaitProvisionStep(
+        start: (
+            onSuccess: () -> Unit,
+            onFailure: (String) -> Unit
+        ) -> Unit
+    ) {
+        suspendCancellableCoroutine<Unit> { continuation ->
+            start(
+                {
+                    if (continuation.isActive) {
+                        continuation.resume(Unit) { _, _, _ -> }
+                    }
+                },
+                { message ->
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(
+                            IllegalStateException(message)
+                        )
+                    }
+                }
+            )
+        }
+    }
 }

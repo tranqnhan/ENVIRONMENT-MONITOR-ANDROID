@@ -1,5 +1,6 @@
 package com.example.environmentmonitorapp.view
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -44,10 +45,12 @@ import com.example.environmentmonitorapp.components.EnvironmentCard
 import com.example.environmentmonitorapp.components.EnvironmentChart
 import com.example.environmentmonitorapp.components.EnvironmentDataColor
 import com.example.environmentmonitorapp.components.EnvironmentDataType
+import com.example.environmentmonitorapp.components.HistoryRangeSelector
 import com.example.environmentmonitorapp.core.SettingsDatastore
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.coroutines.cancellation.CancellationException
 
 class AnalyticsScreen: InternalScreen() {
@@ -62,8 +65,12 @@ class AnalyticsScreen: InternalScreen() {
         var selectedMonitorDeviceUsername by rememberSaveable { mutableStateOf("") }
         var isLoading by rememberSaveable { mutableStateOf(true) }
         var errorMessage by rememberSaveable {mutableStateOf<String?>(null)}
+        var retryToggle by remember { mutableStateOf(false) }
 
-        LaunchedEffect(Unit) {
+        LaunchedEffect(retryToggle) {
+            errorMessage = null
+            isLoading = true
+
             if (!SettingsDatastore(context).isServerURLExist()) {
                 errorMessage = "No server registered"
             } else {
@@ -80,6 +87,7 @@ class AnalyticsScreen: InternalScreen() {
 
             isLoading = false
         }
+
         Column (
             modifier = Modifier
                 .fillMaxWidth(),
@@ -97,23 +105,45 @@ class AnalyticsScreen: InternalScreen() {
 
             errorMessage?.let {
                 Text("Failure: $it.")
+                val interactionSource = remember { MutableInteractionSource() }
+                val buttonIsPressed by interactionSource.collectIsPressedAsState()
+                val buttonColor = when {
+                    buttonIsPressed -> MaterialTheme.colorScheme.primaryContainer
+                    else -> MaterialTheme.colorScheme.primary
+                }
+
+                Button(
+                    onClick = { retryToggle = !retryToggle },
+                    interactionSource = interactionSource,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RectangleShape,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = buttonColor,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("RETRY CONNECTION")
+                }
                 return
             }
 
             if (selectedMonitorDeviceUsername.isNotBlank()) {
-                LoadAnalytics(selectedMonitorDeviceUsername)
+                LoadAnalytics(context, selectedMonitorDeviceUsername)
                 return
             }
 
             if (monitorDeviceUsernames.isNotEmpty()) {
                 MonitorDeviceSelection(
                     monitorDeviceUsernames = monitorDeviceUsernames,
-                    onMonitorDeviceSelect = { selectedMonitorDeviceUsername = it }
+                    onMonitorDeviceSelect = {
+                        selectedMonitorDeviceUsername = it
+                        monitorDeviceUsernames = emptyList()
+                    }
                 )
                 return
             }
 
-            Text("No devices found.")
+            Text("No devices found. Add a new device in Register Device.")
         }
     }
 
@@ -140,8 +170,7 @@ class AnalyticsScreen: InternalScreen() {
     }
 
     @Composable
-    fun LoadAnalytics(monitorDeviceUsername: String) {
-        val context = LocalContext.current
+    fun LoadAnalytics(context: Context, monitorDeviceUsername: String) {
         val client = remember { EnvironmentUpdateClient() }
         var currentData by remember { mutableStateOf<EnvironmentDataPoint?>(null) }
         var dataHistory by remember { mutableStateOf<List<EnvironmentDataPoint>>(emptyList())}
@@ -159,19 +188,6 @@ class AnalyticsScreen: InternalScreen() {
 
                 if (environmentDataResponse.isSuccessful) {
                     currentData = environmentDataResponse.body()
-                }
-
-                val environmentDataHistoryResponse =
-                    RetrofitClient.getAPI(context).getEnvironmentDataHistory(
-                        EnvironmentDataRange(
-                            monitorDeviceUsername,
-                            Instant.EPOCH,
-                            Instant.now()
-                        )
-                    )
-
-                if (environmentDataHistoryResponse.isSuccessful) {
-                    dataHistory = environmentDataHistoryResponse.body()!!
                 }
 
                 coroutineScope {
@@ -194,6 +210,31 @@ class AnalyticsScreen: InternalScreen() {
             } catch (e: Exception) {
                 errorMessage = e.message ?: "Connection failed"
                 isConnect = false
+            }
+        }
+
+        var selectedDays by rememberSaveable {
+            mutableStateOf<Int?>(7)
+        }
+
+        LaunchedEffect(selectedDays) {
+            val end = Instant.now()
+
+            val start = selectedDays?.let { days ->
+                end.minus(days.toLong(), ChronoUnit.DAYS)
+            } ?: Instant.EPOCH
+
+            val environmentDataHistoryResponse =
+                RetrofitClient.getAPI(context).getEnvironmentDataHistory(
+                    EnvironmentDataRange(
+                        monitorDeviceUsername,
+                        start,
+                        end
+                    )
+                )
+
+            if (environmentDataHistoryResponse.isSuccessful) {
+                dataHistory = environmentDataHistoryResponse.body()!!
             }
         }
 
@@ -241,6 +282,11 @@ class AnalyticsScreen: InternalScreen() {
             }
 
             if (dataHistory.isNotEmpty()) {
+                HistoryRangeSelector(
+                    selectedDays,
+                    onDaysSelected = { selectedDays = it }
+                )
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -255,7 +301,7 @@ class AnalyticsScreen: InternalScreen() {
                         fontWeight = FontWeight.Bold,
                         color = EnvironmentDataColor[EnvironmentDataType.TEMPERATURE]!!
                     )
-                    EnvironmentChart(dataHistory, EnvironmentDataType.TEMPERATURE)
+                    EnvironmentChart(context, dataHistory, EnvironmentDataType.TEMPERATURE)
 
                     Text(
                         text = "Humidity",
@@ -264,7 +310,7 @@ class AnalyticsScreen: InternalScreen() {
                         fontWeight = FontWeight.Bold,
                         color = EnvironmentDataColor[EnvironmentDataType.HUMIDITY]!!
                     )
-                    EnvironmentChart(dataHistory, EnvironmentDataType.HUMIDITY)
+                    EnvironmentChart(context, dataHistory, EnvironmentDataType.HUMIDITY)
 
 
                     Text(
@@ -274,7 +320,7 @@ class AnalyticsScreen: InternalScreen() {
                         fontWeight = FontWeight.Bold,
                         color = EnvironmentDataColor[EnvironmentDataType.CO2]!!
                     )
-                    EnvironmentChart(dataHistory, EnvironmentDataType.CO2)
+                    EnvironmentChart(context, dataHistory, EnvironmentDataType.CO2)
                 }
             }
         }

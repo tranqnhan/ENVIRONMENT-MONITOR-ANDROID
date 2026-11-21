@@ -5,6 +5,7 @@ import com.example.environmentmonitorapp.core.SettingsDatastore
 import com.example.environmentmonitorapp.core.TransformURL
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 
 object RetrofitClient {
     private var serverURL: String? = null
@@ -28,6 +29,7 @@ object RetrofitClient {
         if (serverURL != baseUrl) {
             api = Retrofit.Builder()
                 .baseUrl(TransformURL.normalizeBaseURL(baseUrl))
+                .addConverterFactory(ScalarsConverterFactory.create())
                 .addConverterFactory(MoshiConverterFactory.create(MoshiAdapterObject.moshi))
                 .build()
                 .create(ApiService::class.java)

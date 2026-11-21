@@ -1,5 +1,6 @@
 package com.example.environmentmonitorapp.components
 
+import android.content.Context
 import android.text.format.DateFormat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,11 +44,10 @@ import kotlin.math.roundToInt
 
 @Composable
 fun EnvironmentChart(
+    context: Context,
     environmentDataPoints: List<EnvironmentDataPoint>,
     dataType: EnvironmentDataType
 ) {
-    val context = LocalContext.current
-
     if (environmentDataPoints.isEmpty()) {
         Text("No data available.")
         return
@@ -76,11 +76,15 @@ fun EnvironmentChart(
                         it.measuredAt.epochSecond.toDouble() +
                                 it.measuredAt.nano / 1_000_000_000.0
                     },
-                    y = environmentDataPoints.map {
-                        when (dataType) {
-                            EnvironmentDataType.TEMPERATURE -> it.temperature
-                            EnvironmentDataType.CO2 -> it.co2Level
-                            EnvironmentDataType.HUMIDITY -> it.humidity
+                    y = when (dataType) {
+                        EnvironmentDataType.TEMPERATURE -> environmentDataPoints.map {
+                            it.temperature
+                        }
+                        EnvironmentDataType.CO2 -> environmentDataPoints.map {
+                            it.co2Level
+                        }
+                        EnvironmentDataType.HUMIDITY -> environmentDataPoints.map {
+                            it.humidity
                         }
                     }
                 )

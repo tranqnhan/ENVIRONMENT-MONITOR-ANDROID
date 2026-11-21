@@ -49,6 +49,7 @@ import com.example.environmentmonitorapp.core.ProvisionDevice
 import com.example.environmentmonitorapp.core.SettingsDatastore
 import kotlinx.coroutines.launch
 import okio.IOException
+import kotlin.coroutines.cancellation.CancellationException
 
 class RegisterDeviceScreen: InternalScreen() {
     init {
@@ -248,6 +249,7 @@ class RegisterDeviceScreen: InternalScreen() {
                                         )
                                     )
                                     if (response.isSuccessful) {
+                                        provisionDevice.registerUsername = response.body()!!
                                         onReceiveProvisionDevice(provisionDevice)
                                         infoMessage = message
                                     } else {
@@ -255,7 +257,7 @@ class RegisterDeviceScreen: InternalScreen() {
                                     }
 
                                 } catch (e: IOException) {
-                                    infoMessage = "Error: " + e.message
+                                    infoMessage = "Error: " + e.message + ". " + e.stackTrace.contentToString()
                                 }
 
 
@@ -438,31 +440,47 @@ class RegisterDeviceScreen: InternalScreen() {
                 Button(
                     enabled = ssid.isNotEmpty(),
                     onClick = {
-                        isLoading = true
-
                         scope.launch {
-                            provisionDevice.provisionServerUrl(
-                                SettingsDatastore(context).getHTTPSServerURL(),
-                                onSuccess = {
+                            isLoading = true
+                            isProvisioned = false
+
+                            try {
+                                provisionDevice.awaitProvisionStep { success, failure ->
+                                    provisionDevice.provisionUsername(
+                                        onSuccess = success,
+                                        onFailure = failure
+                                    )
+                                }
+
+                                val serverUrl =
+                                    SettingsDatastore(context).getHTTPSServerURL()
+
+                                provisionDevice.awaitProvisionStep { success, failure ->
+                                    provisionDevice.provisionServerUrl(
+                                        serverUrl,
+                                        onSuccess = success,
+                                        onFailure = failure
+                                    )
+                                }
+
+                                provisionDevice.awaitProvisionStep { success, failure ->
                                     provisionDevice.provisionWifi(
                                         ssid,
                                         password,
-                                        onSuccess = {
-                                            statusText = "Success: Device successfully provisioned"
-                                            isProvisioned = true
-                                            isLoading = false
-                                        },
-                                        onFailure = { errorMessage ->
-                                            statusText = "Failure: $errorMessage"
-                                            isLoading = false
-                                        }
+                                        onSuccess = success,
+                                        onFailure = failure
                                     )
-                                },
-                                onFailure = { errorMessage ->
-                                    statusText = "Failure: $errorMessage"
-                                    isLoading = false
                                 }
-                            )
+
+                                statusText = "Success: Device successfully provisioned"
+                                isProvisioned = true
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                statusText = "Failure: ${e.message ?: "Unknown error"}"
+                            } finally {
+                                isLoading = false
+                            }
                         }
                     },
                     interactionSource = interactionSource,
